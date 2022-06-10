@@ -1,4 +1,4 @@
-import { createServer } from "@graphql-yoga/node";
+import { createServer, GraphQLYogaError } from "@graphql-yoga/node";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Resolvers } from "../../types";
@@ -7,6 +7,7 @@ import type { PrismaClient } from "@prisma/client";
 import { NextApiRequest, NextApiResponse } from "next";
 import currencyFormatter from "currency-formatter";
 import { findOrCreateCart } from "../../lib/cart";
+import { stripe } from "../../lib/stripe";
 
 export type GraphQLContext = {
   prisma: PrismaClient;
@@ -157,6 +158,47 @@ const resolvers: Resolvers = {
       }
 
       return findOrCreateCart(prisma, cartId);
+    },
+    createCheckoutSession: async (_, { input }, { prisma }) => {
+      const { cartId } = input;
+
+      const cart = await prisma.cart.findUnique({ where: { id: cartId } });
+      if (!cart) {
+        throw new GraphQLYogaError("Invalid Cart");
+      }
+
+      const cartItems = await prisma.cart
+        .findUnique({ where: { id: cartId } })
+        .items();
+      if (!cartItems || !cartItems.length) {
+        throw new GraphQLYogaError("Cart is empty");
+      }
+
+      const lineItems = cartItems.map((i) => ({
+        quantity: i.quantity,
+        price_data: {
+          currency: currencyCode,
+          unit_amount: i.price,
+          product_data: {
+            name: i.name,
+            description: i.description || undefined,
+            images: i.image ? [i.image] : [],
+          },
+        },
+      }));
+
+      console.log("lineItems", lineItems[0].price_data.product_data);
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: lineItems,
+        mode: "payment",
+        metadata: { cartId: cart.id },
+        success_url:
+          "http://localhost:3000/thankyou?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "http://localhost:3000/cart?cancelled=true",
+      });
+
+      return { id: session.id, url: session.url };
     },
   },
 };

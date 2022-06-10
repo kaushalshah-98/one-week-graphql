@@ -7,6 +7,7 @@ type Mutation {
   removeItem(input: RemoveFromCartInput!): Cart
   increaseCartItem(input: IncreaseCartItemInput!): Cart
   decreaseCartItem(input: DecreaseCartItemInput!): Cart
+  createCheckoutSession(input: createCheckoutSessionInput!): CheckoutSession
 }
 type Cart {
   id: ID!
@@ -28,6 +29,11 @@ type CartItem {
 type Money {
   formatted: String!
   amount: Int!
+}
+
+type CheckoutSession {
+  id: ID!
+  url: String
 }
 
 input AddToCartInput {
@@ -52,5 +58,9 @@ input IncreaseCartItemInput {
 
 input DecreaseCartItemInput {
   id: ID!
+  cartId: ID!
+}
+
+input createCheckoutSessionInput {
   cartId: ID!
 }
