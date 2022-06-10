@@ -126,6 +126,38 @@ const resolvers: Resolvers = {
       });
       return findOrCreateCart(prisma, cartId);
     },
+    decreaseCartItem: async (_, { input }, { prisma }) => {
+      const { cartId, quantity } = await prisma.cartItem.update({
+        data: {
+          quantity: {
+            decrement: 1,
+          },
+        },
+        where: {
+          id_cartId: {
+            cartId: input.cartId,
+            id: input.id,
+          },
+        },
+        select: {
+          cartId: true,
+          quantity: true,
+        },
+      });
+
+      if (quantity <= 0) {
+        await prisma.cartItem.delete({
+          where: {
+            id_cartId: {
+              cartId: input.cartId,
+              id: input.id,
+            },
+          },
+        });
+      }
+
+      return findOrCreateCart(prisma, cartId);
+    },
   },
 };
 
