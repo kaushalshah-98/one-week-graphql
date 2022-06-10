@@ -68,7 +68,6 @@ const resolvers: Resolvers = {
   },
   Mutation: {
     addItem: async (_, { input }, { prisma }) => {
-      if (!input) throw new Error("Input not found");
       const cart = await findOrCreateCart(prisma, input.cartId);
       await prisma.cartItem.upsert({
         create: {
@@ -93,6 +92,17 @@ const resolvers: Resolvers = {
         },
       });
       return cart;
+    },
+    removeItem: async (_, { input }, { prisma }) => {
+      const { cartId } = await prisma.cartItem.delete({
+        where: {
+          id_cartId: {
+            cartId: input.cartId,
+            id: input.id,
+          },
+        },
+      });
+      return findOrCreateCart(prisma, cartId);
     },
   },
 };
