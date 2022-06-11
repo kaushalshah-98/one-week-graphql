@@ -6,8 +6,10 @@ import prisma from "../../lib/prisma";
 import type { PrismaClient } from "@prisma/client";
 import { NextApiRequest, NextApiResponse } from "next";
 import currencyFormatter from "currency-formatter";
-import { findOrCreateCart } from "../../lib/cart";
+import { findOrCreateCart, validateCartItems } from "../../lib/cart";
 import { stripe } from "../../lib/stripe";
+import { products } from "../../lib/products";
+import { origin } from "../../lib/client";
 
 export type GraphQLContext = {
   prisma: PrismaClient;
@@ -174,28 +176,14 @@ const resolvers: Resolvers = {
         throw new GraphQLYogaError("Cart is empty");
       }
 
-      const lineItems = cartItems.map((i) => ({
-        quantity: i.quantity,
-        price_data: {
-          currency: currencyCode,
-          unit_amount: i.price,
-          product_data: {
-            name: i.name,
-            description: i.description || undefined,
-            images: i.image ? [i.image] : [],
-          },
-        },
-      }));
-
-      console.log("lineItems", lineItems[0].price_data.product_data);
+      const lineItems = validateCartItems(products, cartItems);
 
       const session = await stripe.checkout.sessions.create({
+        success_url: `${origin}/thankyou?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/cart?cancelled=true`,
         line_items: lineItems,
-        mode: "payment",
         metadata: { cartId: cart.id },
-        success_url:
-          "http://localhost:3000/thankyou?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "http://localhost:3000/cart?cancelled=true",
+        mode: "payment",
       });
 
       return { id: session.id, url: session.url };
